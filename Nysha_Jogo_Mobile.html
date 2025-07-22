@@ -1,0 +1,310 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Nysha - Jogo Mobile</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background-color: #1a1a1a;
+      font-family: sans-serif;
+    }
+    canvas {
+      display: block;
+      margin: 0 auto;
+      background: linear-gradient(to top, #2b2b2b, #444);
+    }
+    #hud {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      font-size: 18px;
+    }
+    #inventory {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(0,0,0,0.6);
+      color: white;
+      padding: 10px;
+      border-radius: 10px;
+      font-size: 14px;
+    }
+    #dialogueBox {
+      position: absolute;
+      bottom: 70px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.8);
+      color: #fff;
+      padding: 15px;
+      border-radius: 10px;
+      max-width: 400px;
+      display: none;
+    }
+    .bar {
+      height: 16px;
+      width: 200px;
+      background: #555;
+      border: 1px solid #999;
+      margin-bottom: 6px;
+    }
+    .fill {
+      height: 100%;
+      background: #e2725b;
+    }
+    #controls {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 20px;
+    }
+    .btn {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background-color: #333;
+      color: #fff;
+      font-size: 24px;
+      border: none;
+      outline: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="hud">
+    <div>Energia:</div>
+    <div class="bar"><div id="energyFill" class="fill" style="width: 100%"></div></div>
+  </div>
+  <div id="inventory">
+    <strong>Inventário Tribal:</strong>
+    <ul id="inventoryList">
+      <li>Nenhum item</li>
+    </ul>
+  </div>
+  <div id="dialogueBox">🧙‍♂️ "Saudações, Nysha... encontre o rato espiritual e leve-o ao fogo sagrado!"</div>
+  <canvas id="gameCanvas" width="800" height="400"></canvas>
+  <div id="controls">
+    <button class="btn" id="leftBtn">←</button>
+    <button class="btn" id="rightBtn">→</button>
+  </div>
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const energyFill = document.getElementById("energyFill");
+    const dialogueBox = document.getElementById("dialogueBox");
+    const inventoryList = document.getElementById("inventoryList");
+
+    const inventory = [];
+
+    function updateInventory() {
+      inventoryList.innerHTML = "";
+      if (inventory.length === 0) {
+        inventoryList.innerHTML = "<li>Nenhum item</li>";
+      } else {
+        inventory.forEach(item => {
+          const li = document.createElement("li");
+          li.textContent = item;
+          inventoryList.appendChild(li);
+        });
+      }
+    }
+
+    const nysha = {
+      x: 100,
+      y: 300,
+      width: 40,
+      height: 60,
+      color: "#e2725b",
+      dx: 0,
+      energy: 100
+    };
+
+    const rat = {
+      x: 600,
+      y: 320,
+      width: 20,
+      height: 20,
+      color: "#aaa",
+      collected: false
+    };
+
+    const fire = {
+      x: 350,
+      y: 330,
+      width: 30,
+      height: 30,
+      active: false
+    };
+
+    const tree = {
+      x: 250,
+      y: 290,
+      width: 40,
+      height: 70,
+      color: "#2e572e"
+    };
+
+    const npc = {
+      x: 180,
+      y: 300,
+      width: 30,
+      height: 60,
+      color: "#b28dff",
+      talked: false
+    };
+
+    const enemies = [];
+
+    let isNight = false;
+    let timeCounter = 0;
+    const groundLevel = 360;
+
+    function spawnEnemy() {
+      enemies.push({
+        x: 800,
+        y: 310,
+        width: 30,
+        height: 50,
+        color: "#551a8b",
+        dx: -1.5
+      });
+    }
+
+    function drawNysha() {
+      ctx.fillStyle = nysha.color;
+      ctx.fillRect(nysha.x, nysha.y, nysha.width, nysha.height);
+    }
+
+    function drawRat() {
+      if (!rat.collected) {
+        ctx.fillStyle = rat.color;
+        ctx.fillRect(rat.x, rat.y, rat.width, rat.height);
+      }
+    }
+
+    function drawFire() {
+      ctx.fillStyle = fire.active ? "orange" : "#3c2f2f";
+      ctx.fillRect(fire.x, fire.y, fire.width, fire.height);
+    }
+
+    function drawTree() {
+      ctx.fillStyle = tree.color;
+      ctx.fillRect(tree.x, tree.y, tree.width, tree.height);
+    }
+
+    function drawNPC() {
+      ctx.fillStyle = npc.color;
+      ctx.fillRect(npc.x, npc.y, npc.width, npc.height);
+    }
+
+    function drawEnemies() {
+      enemies.forEach(e => {
+        ctx.fillStyle = e.color;
+        ctx.fillRect(e.x, e.y, e.width, e.height);
+      });
+    }
+
+    function drawGround() {
+      ctx.fillStyle = "#2d1e1e";
+      ctx.fillRect(0, groundLevel, canvas.width, canvas.height - groundLevel);
+    }
+
+    function toggleDayNight() {
+      isNight = !isNight;
+      canvas.style.background = isNight
+        ? "linear-gradient(to top, #0a0a1a, #1a1a2b)"
+        : "linear-gradient(to top, #2b2b2b, #444)";
+      if (isNight) spawnEnemy();
+    }
+
+    function checkCollision(obj1, obj2) {
+      return (
+        obj1.x < obj2.x + obj2.width &&
+        obj1.x + obj1.width > obj2.x &&
+        obj1.y < obj2.y + obj2.height &&
+        obj1.y + obj1.height > obj2.y
+      );
+    }
+
+    function update() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawGround();
+      drawTree();
+      drawFire();
+      drawRat();
+      drawNPC();
+      drawNysha();
+      drawEnemies();
+
+      let nextX = nysha.x + nysha.dx;
+      const nextNysha = { ...nysha, x: nextX };
+      if (!checkCollision(nextNysha, tree)) {
+        nysha.x = nextX;
+      }
+
+      if (!rat.collected && checkCollision(nysha, rat)) {
+        rat.collected = true;
+        inventory.push("🐀 Rato espiritual");
+        updateInventory();
+      }
+
+      if (rat.collected && checkCollision(nysha, fire)) {
+        fire.active = true;
+        nysha.energy = Math.min(100, nysha.energy + 40);
+      }
+
+      if (!npc.talked && checkCollision(nysha, npc)) {
+        dialogueBox.style.display = "block";
+        npc.talked = true;
+        setTimeout(() => dialogueBox.style.display = "none", 5000);
+      }
+
+      enemies.forEach(e => {
+        e.x += e.dx;
+        if (checkCollision(nysha, e)) {
+          nysha.energy = Math.max(0, nysha.energy - 0.5);
+        }
+      });
+
+      nysha.energy = Math.max(0, nysha.energy - 0.02);
+      energyFill.style.width = nysha.energy + "%";
+
+      timeCounter++;
+      if (timeCounter % 1000 === 0) {
+        toggleDayNight();
+      }
+    }
+
+    function loop() {
+      update();
+      requestAnimationFrame(loop);
+    }
+
+    // Teclado
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowRight") nysha.dx = 3;
+      else if (e.key === "ArrowLeft") nysha.dx = -3;
+    });
+
+    document.addEventListener("keyup", (e) => {
+      if (e.key === "ArrowRight" || e.key === "ArrowLeft") nysha.dx = 0;
+    });
+
+    // Toque
+    document.getElementById("leftBtn").addEventListener("touchstart", () => nysha.dx = -3);
+    document.getElementById("rightBtn").addEventListener("touchstart", () => nysha.dx = 3);
+    document.getElementById("leftBtn").addEventListener("touchend", () => nysha.dx = 0);
+    document.getElementById("rightBtn").addEventListener("touchend", () => nysha.dx = 0);
+
+    updateInventory();
+    loop();
+  </script>
+</body>
+</html>
